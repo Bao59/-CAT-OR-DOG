@@ -2,9 +2,12 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>AI 貓狗視覺分類系統</title>
     <style>
+        /* 響應式黃金法則：讓所有元素的寬度計算包含邊框與內距 */
+        * { box-sizing: border-box; }
+        
         :root {
             --primary-color: #3b82f6;
             --bg-color: #f3f4f6;
@@ -13,20 +16,24 @@
         }
         
         body { 
-            font-family: -apple-system, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             background-color: var(--bg-color);
             color: var(--text-main);
             display: flex;
             flex-direction: column;
             align-items: center;
-            padding: 40px 20px;
+            /* 在手機上減少外圍留白 */
+            padding: 20px 15px; 
+            margin: 0;
+            min-height: 100vh;
         }
 
         .container {
             background-color: var(--card-bg);
             border-radius: 16px;
             box-shadow: 0 10px 25px rgba(0,0,0,0.05);
-            padding: 30px;
+            /* 電腦版維持 30px，手機版縮減為 20px */
+            padding: 30px 20px; 
             width: 100%;
             max-width: 500px;
             text-align: center;
@@ -34,8 +41,13 @@
 
         h1 { margin-top: 0; font-size: 1.5rem; }
         
-        /* 檔案上傳區塊的樣式 */
+        /* 修正跑版的核心：加入 display: flex 與 width: 100% */
         .upload-area {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
             border: 2px dashed #cbd5e1;
             border-radius: 12px;
             padding: 40px 20px;
@@ -50,17 +62,19 @@
         
         #image-preview {
             max-width: 100%;
-            max-height: 300px;
+            /* 限制最高高度，避免直式照片佔滿整個手機螢幕 */
+            max-height: 250px; 
+            object-fit: contain;
             border-radius: 8px;
             margin-top: 15px;
             display: none;
         }
 
-        /* 進度條樣式 */
-        #label-container { margin-top: 20px; text-align: left; }
+        /* 進度條響應式設計 */
+        #label-container { margin-top: 20px; text-align: left; width: 100%; }
         .result-row { margin-bottom: 12px; }
-        .class-name { font-weight: bold; margin-bottom: 5px; display: block; }
-        .progress-bg { background: #e2e8f0; height: 12px; border-radius: 6px; overflow: hidden; }
+        .class-name { font-weight: bold; margin-bottom: 5px; display: block; font-size: 0.95rem; }
+        .progress-bg { background: #e2e8f0; height: 12px; border-radius: 6px; overflow: hidden; width: 100%; }
         .progress-fill { background: var(--primary-color); height: 100%; width: 0%; transition: width 0.3s ease; }
     </style>
 </head>
@@ -68,10 +82,10 @@
 
     <div class="container">
         <h1>影像辨識分析系統</h1>
-        <p style="color: #64748b; margin-bottom: 25px;">(模型初始化中，請稍候...)</p>
+        <p id="status-text" style="color: #64748b; margin-bottom: 20px; font-size: 0.9rem;">(模型初始化中，請稍候...)</p>
 
         <label class="upload-area" id="upload-label">
-            <div id="upload-text">點擊此處上傳圖片 (JPG / PNG)</div>
+            <div id="upload-text" style="font-weight: 500; color: #475569;">點擊此處上傳圖片<br><span style="font-size: 0.8rem; color: #94a3b8;">(支援 JPG / PNG，手機可直接拍照)</span></div>
             <img id="image-preview" src="" alt="圖片預覽" />
             <input type="file" id="image-upload" accept="image/*">
         </label>
@@ -85,8 +99,8 @@
     <script type="text/javascript">
         const URL = "./model/";
         let model, maxPredictions;
+        const statusText = document.getElementById('status-text');
 
-        // 1. 網頁載入時立刻讀取模型
         window.onload = async function() {
             try {
                 const modelURL = URL + "model.json";
@@ -94,15 +108,14 @@
                 model = await tmImage.load(modelURL, metadataURL);
                 maxPredictions = model.getTotalClasses();
                 
-                document.querySelector('p').innerText = "系統已就緒，請上傳照片進行辨識";
-                document.querySelector('p').style.color = "#10b981"; // 綠色提示
+                statusText.innerText = "系統已就緒，請上傳照片進行辨識";
+                statusText.style.color = "#10b981"; 
             } catch (error) {
-                document.querySelector('p').innerText = "模型載入失敗，請確認 ./model/ 路徑！";
-                document.querySelector('p').style.color = "#ef4444";
+                statusText.innerText = "模型載入失敗，請確認 ./model/ 內是否有檔案！";
+                statusText.style.color = "#ef4444";
             }
         };
 
-        // 2. 監聽圖片上傳事件
         const imageUpload = document.getElementById('image-upload');
         const imagePreview = document.getElementById('image-preview');
         const uploadText = document.getElementById('upload-text');
@@ -110,14 +123,12 @@
         imageUpload.addEventListener('change', function(event) {
             const file = event.target.files[0];
             if (file && model) {
-                // 顯示圖片預覽
                 const reader = new FileReader();
                 reader.onload = function(e) {
                     imagePreview.src = e.target.result;
                     imagePreview.style.display = 'block';
                     uploadText.style.display = 'none';
                     
-                    // 圖片載入完成後進行推論
                     imagePreview.onload = async function() {
                         await predict(imagePreview);
                     }
@@ -126,15 +137,11 @@
             }
         });
 
-        // 3. 進行預測
         async function predict(imageElement) {
-            // 將靜態圖片送入模型
             const prediction = await model.predict(imageElement);
-            
             const labelContainer = document.getElementById("label-container");
-            labelContainer.innerHTML = ""; // 清空舊結果
+            labelContainer.innerHTML = ""; 
 
-            // 產出結果與進度條
             for (let i = 0; i < maxPredictions; i++) {
                 const className = prediction[i].className;
                 const prob = (prediction[i].probability * 100).toFixed(1);
