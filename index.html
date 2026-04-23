@@ -3,99 +3,79 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI 貓狗視覺分類系統 | 專業版</title>
+    <title>AI 貓狗視覺分類系統</title>
     <style>
-        /* CSS: 打造專業、乾淨的現代化 SaaS 介面 */
         :root {
-            --primary-color: #2563eb;
-            --bg-color: #f8fafc;
+            --primary-color: #3b82f6;
+            --bg-color: #f3f4f6;
             --card-bg: #ffffff;
-            --text-main: #1e293b;
-            --text-muted: #64748b;
+            --text-main: #1f2937;
         }
         
         body { 
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            font-family: -apple-system, sans-serif;
             background-color: var(--bg-color);
             color: var(--text-main);
             display: flex;
             flex-direction: column;
             align-items: center;
             padding: 40px 20px;
-            margin: 0;
         }
 
         .container {
             background-color: var(--card-bg);
             border-radius: 16px;
-            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.05);
             padding: 30px;
             width: 100%;
             max-width: 500px;
             text-align: center;
         }
 
-        h1 { margin-top: 0; font-size: 1.5rem; color: var(--text-main); }
-        p.subtitle { color: var(--text-muted); font-size: 0.95rem; margin-bottom: 25px; }
-
-        button {
-            background-color: var(--primary-color);
-            color: white;
-            border: none;
-            padding: 12px 28px;
-            border-radius: 8px;
-            font-size: 1rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            box-shadow: 0 4px 6px rgba(37, 99, 235, 0.2);
-        }
-        button:hover { background-color: #1d4ed8; transform: translateY(-1px); }
-        button:active { transform: translateY(1px); }
-
-        #webcam-container {
-            margin: 20px auto;
+        h1 { margin-top: 0; font-size: 1.5rem; }
+        
+        /* 檔案上傳區塊的樣式 */
+        .upload-area {
+            border: 2px dashed #cbd5e1;
             border-radius: 12px;
-            overflow: hidden;
-            background-color: #e2e8f0;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 300px; /* 預留攝影機空間 */
+            padding: 40px 20px;
+            margin: 20px 0;
+            background-color: #f8fafc;
+            cursor: pointer;
+            transition: all 0.2s;
         }
-        canvas { display: block; width: 100%; height: auto; }
-
-        #label-container {
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-            margin-top: 20px;
-        }
-
-        /* 辨識結果的進度條設計 */
-        .result-row {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            background: #f1f5f9;
-            padding: 10px 15px;
+        .upload-area:hover { border-color: var(--primary-color); background-color: #eff6ff; }
+        
+        input[type="file"] { display: none; }
+        
+        #image-preview {
+            max-width: 100%;
+            max-height: 300px;
             border-radius: 8px;
+            margin-top: 15px;
+            display: none;
         }
-        .class-name { font-weight: 600; width: 30%; text-align: left; }
-        .progress-wrapper { flex-grow: 1; background: #e2e8f0; height: 10px; border-radius: 5px; margin: 0 15px; overflow: hidden; }
-        .progress-bar { height: 100%; background: var(--primary-color); width: 0%; transition: width 0.15s ease-out; }
-        .prob-value { font-weight: bold; width: 15%; text-align: right; color: var(--primary-color); }
+
+        /* 進度條樣式 */
+        #label-container { margin-top: 20px; text-align: left; }
+        .result-row { margin-bottom: 12px; }
+        .class-name { font-weight: bold; margin-bottom: 5px; display: block; }
+        .progress-bg { background: #e2e8f0; height: 12px; border-radius: 6px; overflow: hidden; }
+        .progress-fill { background: var(--primary-color); height: 100%; width: 0%; transition: width 0.3s ease; }
     </style>
 </head>
 <body>
 
     <div class="container">
-        <h1>貓狗視覺分類系統</h1>
-        <p class="subtitle">邊緣運算即時推論 (Powered by TF.js)</p>
-        
-        <button type="button" id="start-btn" onclick="init()">啟動 AI 辨識</button>
-        
-        <div id="webcam-container"><span style="color: #94a3b8; font-size: 0.9rem;">等待啟動攝影機...</span></div>
+        <h1>影像辨識分析系統</h1>
+        <p style="color: #64748b; margin-bottom: 25px;">(模型初始化中，請稍候...)</p>
+
+        <label class="upload-area" id="upload-label">
+            <div id="upload-text">點擊此處上傳圖片 (JPG / PNG)</div>
+            <img id="image-preview" src="" alt="圖片預覽" />
+            <input type="file" id="image-upload" accept="image/*">
+        </label>
+
         <div id="label-container"></div>
     </div>
 
@@ -103,80 +83,70 @@
     <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
 
     <script type="text/javascript">
-        // 核心邏輯：指向你的模型資料夾
-        const URL = "./model/"; 
-        let model, webcam, labelContainer, maxPredictions;
-        let isPlaying = false;
+        const URL = "./model/";
+        let model, maxPredictions;
 
-        async function init() {
-            if (isPlaying) return; // 避免重複啟動
-            
-            const btn = document.getElementById("start-btn");
-            btn.innerText = "模型載入中...";
-            btn.disabled = true;
-
-            const modelURL = URL + "model.json";
-            const metadataURL = URL + "metadata.json";
-
+        // 1. 網頁載入時立刻讀取模型
+        window.onload = async function() {
             try {
-                // 1. 載入模型大腦
+                const modelURL = URL + "model.json";
+                const metadataURL = URL + "metadata.json";
                 model = await tmImage.load(modelURL, metadataURL);
                 maxPredictions = model.getTotalClasses();
-
-                // 2. 設定並啟動攝影機 (眼睛)
-                const flip = true; 
-                webcam = new tmImage.Webcam(400, 400, flip); 
-                await webcam.setup(); 
-                await webcam.play();
-                window.requestAnimationFrame(loop);
-
-                // 3. 清理預設畫面並將攝影機掛載到網頁上
-                const webcamContainer = document.getElementById("webcam-container");
-                webcamContainer.innerHTML = ""; 
-                webcamContainer.appendChild(webcam.canvas);
-
-                // 4. 動態生成儀表板 (進度條)
-                labelContainer = document.getElementById("label-container");
-                labelContainer.innerHTML = ""; // 清空
-                for (let i = 0; i < maxPredictions; i++) {
-                    const row = document.createElement("div");
-                    row.className = "result-row";
-                    row.innerHTML = `
-                        <span class="class-name">讀取中</span>
-                        <div class="progress-wrapper"><div class="progress-bar"></div></div>
-                        <span class="prob-value">0%</span>
-                    `;
-                    labelContainer.appendChild(row);
-                }
-
-                btn.innerText = "系統運作中";
-                btn.style.backgroundColor = "#10b981"; // 變成綠色代表成功
-                isPlaying = true;
-
+                
+                document.querySelector('p').innerText = "系統已就緒，請上傳照片進行辨識";
+                document.querySelector('p').style.color = "#10b981"; // 綠色提示
             } catch (error) {
-                console.error("載入失敗:", error);
-                alert("模型載入失敗！請確認 ./model/ 資料夾內是否有正確的檔案。");
-                btn.innerText = "啟動失敗";
+                document.querySelector('p').innerText = "模型載入失敗，請確認 ./model/ 路徑！";
+                document.querySelector('p').style.color = "#ef4444";
             }
-        }
+        };
 
-        async function loop() {
-            webcam.update(); 
-            await predict();
-            window.requestAnimationFrame(loop);
-        }
+        // 2. 監聽圖片上傳事件
+        const imageUpload = document.getElementById('image-upload');
+        const imagePreview = document.getElementById('image-preview');
+        const uploadText = document.getElementById('upload-text');
 
-        // 5. 進行預測並更新 UI
-        async function predict() {
-            const prediction = await model.predict(webcam.canvas);
+        imageUpload.addEventListener('change', function(event) {
+            const file = event.target.files[0];
+            if (file && model) {
+                // 顯示圖片預覽
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    imagePreview.src = e.target.result;
+                    imagePreview.style.display = 'block';
+                    uploadText.style.display = 'none';
+                    
+                    // 圖片載入完成後進行推論
+                    imagePreview.onload = async function() {
+                        await predict(imagePreview);
+                    }
+                }
+                reader.readAsDataURL(file);
+            }
+        });
+
+        // 3. 進行預測
+        async function predict(imageElement) {
+            // 將靜態圖片送入模型
+            const prediction = await model.predict(imageElement);
+            
+            const labelContainer = document.getElementById("label-container");
+            labelContainer.innerHTML = ""; // 清空舊結果
+
+            // 產出結果與進度條
             for (let i = 0; i < maxPredictions; i++) {
                 const className = prediction[i].className;
-                const prob = (prediction[i].probability * 100).toFixed(0);
+                const prob = (prediction[i].probability * 100).toFixed(1);
                 
-                const row = labelContainer.childNodes[i];
-                row.querySelector(".class-name").innerText = className;
-                row.querySelector(".progress-bar").style.width = prob + "%";
-                row.querySelector(".prob-value").innerText = prob + "%";
+                labelContainer.innerHTML += `
+                    <div class="result-row">
+                        <span class="class-name">${className} (${prob}%)</span>
+                        <div class="progress-bg">
+                            <div class="progress-fill" style="width: ${prob}%"></div>
+                        </div>
+                    </div>
+                `;
             }
         }
     </script>
