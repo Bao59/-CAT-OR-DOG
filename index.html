@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 貓狗視覺辨識系統</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f0f2f5; display: flex; flex-direction: column; align-items: center; padding: 20px; }
+        h1 { color: #1a73e8; }
+        #webcam-container { background: #fff; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); padding: 10px; margin: 20px 0; }
+        canvas { border-radius: 8px; width: 100%; max-width: 400px; height: auto; }
+        #label-container { display: flex; flex-direction: column; gap: 10px; width: 100%; max-width: 400px; }
+        .prediction-row { background: #fff; padding: 10px 15px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .label-name { font-weight: bold; color: #3c4043; }
+        .prob-bar-bg { background: #e8eaed; height: 10px; width: 100px; border-radius: 5px; overflow: hidden; margin-left: 10px; }
+        .prob-bar-fill { background: #34a853; height: 100%; transition: width 0.2s ease; }
+        button { background-color: #1a73e8; color: white; border: none; padding: 12px 24px; border-radius: 8px; font-size: 16px; cursor: pointer; transition: background 0.3s; }
+        button:hover { background-color: #1557b0; }
+    </style>
+</head>
+<body>
+
+    <h1>視覺辨識系統：貓狗分類器</h1>
+    <button type="button" onclick="init()">啟動 AI 辨識</button>
+    
+    <div id="webcam-container"></div>
+    <div id="label-container"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
+
+    <script type="text/javascript">
+        // 指向模型檔案夾的相對路徑
+        const URL = "./model/";
+
+        let model, webcam, labelContainer, maxPredictions;
+
+        async function init() {
+            const modelURL = URL + "model.json";
+            const metadataURL = URL + "metadata.json";
+
+            // 1. 載入模型 (model.json 會自動抓取 weights.bin)
+            try {
+                model = await tmImage.load(modelURL, metadataURL);
+                maxPredictions = model.getTotalClasses();
+
+                // 2. 設定 Webcam
+                const flip = true; 
+                webcam = new tmImage.Webcam(400, 400, flip); 
+                await webcam.setup(); 
+                await webcam.play();
+                window.requestAnimationFrame(loop);
+
+                // 3. 初始化 UI
+                document.getElementById("webcam-container").appendChild(webcam.canvas);
+                labelContainer = document.getElementById("label-container");
+                for (let i = 0; i < maxPredictions; i++) {
+                    const row = document.createElement("div");
+                    row.className = "prediction-row";
+                    row.innerHTML = `<span class="label-name"></span><div style="display:flex; align-items:center;"><span class="prob-text">0%</span><div class="prob-bar-bg"><div class="prob-bar-fill" style="width: 0%"></div></div></div>`;
+                    labelContainer.appendChild(row);
+                }
+            } catch (e) {
+                alert("模型載入失敗，請檢查檔案路徑或透過 HTTPS 存取。");
+                console.error(e);
+            }
+        }
+
+        async function loop() {
+            webcam.update(); 
+            await predict();
+            window.requestAnimationFrame(loop);
+        }
+
+        async function predict() {
+            const prediction = await model.predict(webcam.canvas);
+            for (let i = 0; i < maxPredictions; i++) {
+                const classPrediction = prediction[i].className;
+                const prob = (prediction[i].probability * 100).toFixed(0);
+                
+                const row = labelContainer.childNodes[i];
+                row.querySelector(".label-name").innerText = classPrediction;
+                row.querySelector(".prob-text").innerText = prob + "%";
+                row.querySelector(".prob-bar-fill").style.width = prob + "%";
+            }
+        }
+    </script>
+</body>
+</html>
